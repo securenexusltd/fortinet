@@ -1,0 +1,93 @@
+# This configuration is based on a bonded SDWAN interfaces which is load balanced and failover.
+# The configuration also includes 3 vlans which also have firewalls for outbound HTTP and HTTPS traffic only
+
+provider "fortios" {
+  username = "your_username"
+  password = "your_old_password"
+  address  = "fortigate_address"
+}
+
+# Define SD-WAN interfaces in bonded (load balanced and failover) configuration
+resource "fortios_system_interface" "wan1" {
+  name      = "wan1"
+  type      = "wan"
+  sdwan_intf = "sdwan1"
+}
+
+resource "fortios_system_interface" "wan2" {
+  name      = "wan2"
+  type      = "wan"
+  sdwan_intf = "sdwan1"
+}
+
+# Configure SD-WAN interface members for bonded configuration
+resource "fortios_system_sdwan_interface" "sdwan_intf" {
+  member {
+    interface = fortios_system_interface.wan1.name
+    priority  = 1
+  }
+  member {
+    interface = fortios_system_interface.wan2.name
+    priority  = 2
+  }
+  mode = "lb-failover"
+}
+
+# Define internal VLAN interfaces tied to SD-WAN bonded configuration
+resource "fortios_system_interface" "internal_vlan1" {
+  name      = "internal_vlan1"
+  type      = "lan"
+  vdom      = "root"
+  vlan_id   = 10
+  sdwan_intf = fortios_system_sdwan_interface.sdwan_intf.name
+}
+
+resource "fortios_system_interface" "internal_vlan2" {
+  name      = "internal_vlan2"
+  type      = "lan"
+  vdom      = "root"
+  vlan_id   = 20
+  sdwan_intf = fortios_system_sdwan_interface.sdwan_intf.name
+}
+
+resource "fortios_system_interface" "internal_vlan3" {
+  name      = "internal_vlan3"
+  type      = "lan"
+  vdom      = "root"
+  vlan_id   = 30
+  sdwan_intf = fortios_system_sdwan_interface.sdwan_intf.name
+}
+
+# Define firewall policies for HTTP and HTTPS traffic outbound for each VLAN
+resource "fortios_firewall_policy" "http_https_policy_vlan1" {
+  name         = "allow_http_https_vlan1"
+  srcintf      = fortios_system_interface.internal_vlan1.name
+  dstintf      = "wan1"
+  srcaddr      = ["all"]
+  dstaddr      = ["all"]
+  action       = "accept"
+  schedule     = "always"
+  service      = ["HTTP", "HTTPS"]
+}
+
+resource "fortios_firewall_policy" "http_https_policy_vlan2" {
+  name         = "allow_http_https_vlan2"
+  srcintf      = fortios_system_interface.internal_vlan2.name
+  dstintf      = "wan2"
+  srcaddr      = ["all"]
+  dstaddr      = ["all"]
+  action       = "accept"
+  schedule     = "always"
+  service      = ["HTTP", "HTTPS"]
+}
+
+resource "fortios_firewall_policy" "http_https_policy_vlan3" {
+  name         = "allow_http_https_vlan3"
+  srcintf      = fortios_system_interface.internal_vlan3.name
+  dstintf      = "wan1"
+  srcaddr      = ["all"]
+  dstaddr      = ["all"]
+  action       = "accept"
+  schedule     = "always"
+  service      = ["HTTP", "HTTPS"]
+}
